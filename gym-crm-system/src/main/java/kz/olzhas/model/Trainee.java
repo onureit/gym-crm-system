@@ -1,4 +1,4 @@
-package kz.olzhas.dao;
+package kz.olzhas.model;
 
 public class Trainee {
     
