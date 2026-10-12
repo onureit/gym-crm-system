@@ -1,0 +1,7 @@
+kz\olzhas\App.class
+kz\olzhas\dao\Trainer.class
+kz\olzhas\dao\Training.class
+kz\olzhas\dao\User.class
+kz\olzhas\dao\Trainee.class
+kz\olzhas\config\AppConfig.class
+kz\olzhas\service\GymService.class
