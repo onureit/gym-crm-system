@@ -1,24 +1,60 @@
 package kz.olzhas.model;
 
+import java.time.Duration;
+import java.time.LocalDate;
+
 public class Training {
+
+    private Long id;
+    private Long traineeId;
+    private Long trainerId;
     private String trainingName;
-    private String trainingType;
-    private String trainerUsername;
-    private String traineeUsername;
-    private String trainingDate;
-    private int trainingDuration;
+    private TrainingType trainingType;
+    private LocalDate trainingDate;
+    private Duration trainingDuration;
 
-    public Training() {
-    }
+    public Training() {}
 
-    public Training(String trainingName, String trainingType, String trainerUsername,
-                    String traineeUsername, String trainingDate, int trainingDuration) {
+    public Training(
+            Long id,
+            Long traineeId,
+            Long trainerId,
+            String trainingName,
+            TrainingType trainingType,
+            LocalDate trainingDate,
+            Duration trainingDuration) {
+
+        this.id = id;
+        this.traineeId = traineeId;
+        this.trainerId = trainerId;
         this.trainingName = trainingName;
         this.trainingType = trainingType;
-        this.trainerUsername = trainerUsername;
-        this.traineeUsername = traineeUsername;
         this.trainingDate = trainingDate;
         this.trainingDuration = trainingDuration;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Long getTraineeId() {
+        return traineeId;
+    }
+
+    public void setTraineeId(Long traineeId) {
+        this.traineeId = traineeId;
+    }
+
+    public Long getTrainerId() {
+        return trainerId;
+    }
+
+    public void setTrainerId(Long trainerId) {
+        this.trainerId = trainerId;
     }
 
     public String getTrainingName() {
@@ -29,43 +65,27 @@ public class Training {
         this.trainingName = trainingName;
     }
 
-    public String getTrainingType() {
+    public TrainingType getTrainingType() {
         return trainingType;
     }
 
-    public void setTrainingType(String trainingType) {
+    public void setTrainingType(TrainingType trainingType) {
         this.trainingType = trainingType;
     }
 
-    public String getTrainerUsername() {
-        return trainerUsername;
-    }
-
-    public void setTrainerUsername(String trainerUsername) {
-        this.trainerUsername = trainerUsername;
-    }
-
-    public String getTraineeUsername() {
-        return traineeUsername;
-    }
-
-    public void setTraineeUsername(String traineeUsername) {
-        this.traineeUsername = traineeUsername;
-    }
-
-    public String getTrainingDate() {
+    public LocalDate getTrainingDate() {
         return trainingDate;
     }
 
-    public void setTrainingDate(String trainingDate) {
+    public void setTrainingDate(LocalDate trainingDate) {
         this.trainingDate = trainingDate;
     }
 
-    public int getTrainingDuration() {
+    public Duration getTrainingDuration() {
         return trainingDuration;
     }
 
-    public void setTrainingDuration(int trainingDuration) {
+    public void setTrainingDuration(Duration trainingDuration) {
         this.trainingDuration = trainingDuration;
     }
 }
