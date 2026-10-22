@@ -4,12 +4,20 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import kz.olzhas.component.InMemoryStorage;
 import kz.olzhas.config.AppConfig;
+import kz.olzhas.exceptions.TraineeNotFoundException;
+import kz.olzhas.exceptions.TrainerNotFoundException;
+import kz.olzhas.exceptions.TrainingNotFoundException;
+import kz.olzhas.dao.TraineeDao;
+import kz.olzhas.dao.TrainerDao;
+import kz.olzhas.dao.TrainingDao;
+import kz.olzhas.dao.impl.InMemoryTraineeDao;
+import kz.olzhas.dao.impl.InMemoryTrainerDao;
+import kz.olzhas.dao.impl.InMemoryTrainingDao;
 import kz.olzhas.model.Trainee;
 import kz.olzhas.model.Trainer;
 import kz.olzhas.model.Training;
@@ -63,6 +71,9 @@ public class AppTest {
 
     @Test
     public void contextLoadsAllNamespacesAndPreparedData() {
+        assertTrue(context.getBean(TraineeDao.class) instanceof InMemoryTraineeDao);
+        assertTrue(context.getBean(TrainerDao.class) instanceof InMemoryTrainerDao);
+        assertTrue(context.getBean(TrainingDao.class) instanceof InMemoryTrainingDao);
         InMemoryStorage storage = context.getBean(InMemoryStorage.class);
         assertSame(context.getBean("traineeStorage"), storage.getTrainees());
         assertSame(context.getBean("trainerStorage"), storage.getTrainers());
@@ -89,9 +100,9 @@ public class AppTest {
         assertEquals("Alicia", stored.getFirstName());
         assertEquals("Alice.Brown", stored.getUsername());
         assertEquals(password, stored.getPassword());
-        assertTrue(gym.deleteTrainee(created.getId()));
-        assertNull(gym.selectTrainee(created.getId()));
-        assertFalse(gym.deleteTrainee(created.getId()));
+        gym.deleteTrainee(created.getId());
+        assertThrows(TraineeNotFoundException.class, () -> gym.selectTrainee(created.getId()));
+        assertThrows(TraineeNotFoundException.class, () -> gym.deleteTrainee(created.getId()));
     }
 
     @Test
@@ -131,22 +142,22 @@ public class AppTest {
         Training session = gym.createTraining(training(created.getId(), 1));
         assertEquals(Long.valueOf(2), session.getId());
         assertEquals(created.getId(), gym.selectTraining(session.getId()).getTraineeId());
-        assertTrue(gym.deleteTrainee(created.getId()));
+        gym.deleteTrainee(created.getId());
         assertNotNull(gym.selectTraining(session.getId()));
         assertNotNull(gym.selectTraining(1));
     }
 
     @Test
     public void missingRecordsHavePredictableResults() {
-        assertNull(gym.selectTrainee(999));
-        assertNull(gym.selectTrainer(999));
-        assertNull(gym.selectTraining(999));
+        assertThrows(TraineeNotFoundException.class, () -> gym.selectTrainee(999));
+        assertThrows(TrainerNotFoundException.class, () -> gym.selectTrainer(999));
+        assertThrows(TrainingNotFoundException.class, () -> gym.selectTraining(999));
         Trainee missing = trainee("Missing", "User");
         missing.setId(999L);
-        assertFalse(gym.updateTrainee(missing));
+        assertThrows(TraineeNotFoundException.class, () -> gym.updateTrainee(missing));
         Trainer absent = trainer("Missing", "Trainer");
         absent.setId(999L);
-        assertFalse(gym.updateTrainer(absent));
+        assertThrows(TrainerNotFoundException.class, () -> gym.updateTrainer(absent));
     }
 
     @Test
@@ -157,5 +168,15 @@ public class AppTest {
             assertEquals(1, other.getBean(GymService.class).listTrainees().size());
             assertNotSame(context.getBean("traineeStorage"), other.getBean("traineeStorage"));
         }
+    }
+
+    private static void assertThrows(Class<? extends RuntimeException> expected, Runnable action) {
+        try {
+            action.run();
+        } catch (RuntimeException exception) {
+            assertTrue("Unexpected exception: " + exception, expected.isInstance(exception));
+            return;
+        }
+        org.junit.Assert.fail("Expected " + expected.getSimpleName());
     }
 }

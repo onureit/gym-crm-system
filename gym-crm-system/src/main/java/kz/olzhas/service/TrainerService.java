@@ -1,66 +1,62 @@
 package kz.olzhas.service;
 
-import kz.olzhas.dao.TraineeDao;
-import kz.olzhas.dao.TrainerDao;
-import kz.olzhas.model.Trainee;
-import kz.olzhas.model.Trainer;
+import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.UUID;
+import kz.olzhas.dao.TrainerDao;
+import kz.olzhas.exceptions.TrainerNotFoundException;
+import kz.olzhas.model.Trainer;
+import kz.olzhas.util.UserRegistry;
 
 @Service
 public class TrainerService {
-    private TraineeDao traineeDao;
-    private TrainerDao trainerDao;
+    private static final Logger LOGGER = LoggerFactory.getLogger(TrainerService.class);
 
-    @Autowired
-    public void setTraineeDao(TraineeDao traineeDao) {
-        this.traineeDao = traineeDao;
-    }
+    private TrainerDao trainerDao;
+    private UserRegistry userRegistry;
 
     @Autowired
     public void setTrainerDao(TrainerDao trainerDao) {
         this.trainerDao = trainerDao;
     }
 
+    @Autowired
+    public void setUserRegistry(UserRegistry userRegistry) {
+        this.userRegistry = userRegistry;
+    }
+
     public Trainer create(Trainer trainer) {
-        String baseUsername = trainer.getFirstName() + "." + trainer.getLastName();
-        String username = baseUsername;
-        int suffix = 1;
-        while (usernameExists(username)) {
-            username = baseUsername + suffix++;
-        }
-        trainer.setUsername(username);
-        trainer.setPassword(UUID.randomUUID().toString().replace("-", "").substring(0, 10));
-        return trainerDao.create(trainer);
+        trainer.setUsername(userRegistry.generateUserName(trainer));
+        trainer.setPassword(userRegistry.generatePassword());
+
+        Trainer created = trainerDao.create(trainer);
+        LOGGER.info("Created trainer with ID: {}", created.getId());
+        return created;
     }
 
     public boolean update(Trainer trainer) {
-        return trainerDao.update(trainer);
+        LOGGER.debug("Updating trainer with ID: {}", trainer.getId());
+        boolean updated = trainerDao.update(trainer);
+        if (updated) {
+            LOGGER.info("Updated trainer with ID: {}", trainer.getId());
+        }
+        return updated;
     }
 
     public Trainer findById(long id) {
-        return trainerDao.findById(id);
+        LOGGER.debug("Finding trainer with ID: {}", id);
+        return trainerDao.findById(id).orElseThrow(() -> {
+            LOGGER.warn("Trainer with ID {} does not exist", id);
+            return new TrainerNotFoundException("Trainer with ID " + id + " does not exist.");
+        });
     }
 
     public List<Trainer> findAll() {
+        LOGGER.debug("Finding all trainers");
         return trainerDao.findAll();
-    }
-
-    private boolean usernameExists(String username) {
-        for (Trainee trainee : traineeDao.findAll()) {
-            if (username.equals(trainee.getUsername())) {
-                return true;
-            }
-        }
-        for (Trainer trainer : trainerDao.findAll()) {
-            if (username.equals(trainer.getUsername())) {
-                return true;
-            }
-        }
-        return false;
     }
 }
