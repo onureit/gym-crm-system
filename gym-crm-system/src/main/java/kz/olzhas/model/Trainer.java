@@ -1,11 +1,13 @@
 package kz.olzhas.model;
 
-public class Trainer extends User {
+
+public final class Trainer extends User {
 
     private TrainingType specialization;
 
-    public Trainer() {
-        super();
+    public Trainer(String firstName, String lastName, boolean active, TrainingType specialization) {
+        super(firstName, lastName, active);
+        this.specialization = specialization;
     }
 
     public Trainer(
@@ -21,11 +23,12 @@ public class Trainer extends User {
         this.specialization = specialization;
     }
 
-    public TrainingType getSpecialization() {
-        return specialization;
+    public void updateProfile(String firstName, String lastName, TrainingType specialization) {
+        rename(firstName, lastName);
+        this.specialization = specialization;
     }
 
-    public void setSpecialization(TrainingType specialization) {
-        this.specialization = specialization;
+    public TrainingType getSpecialization() {
+        return specialization;
     }
 }

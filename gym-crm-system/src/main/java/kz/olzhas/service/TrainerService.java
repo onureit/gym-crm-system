@@ -30,9 +30,9 @@ public class TrainerService {
     }
 
     public Trainer create(Trainer trainer) {
-        trainer.setUsername(userRegistry.generateUserName(trainer));
-        trainer.setPassword(userRegistry.generatePassword());
-
+        trainer.assignCredentials(
+                userRegistry.generateUsername(trainer.getFirstName(), trainer.getLastName()),
+                userRegistry.generatePassword());
         Trainer created = trainerDao.create(trainer);
         LOGGER.info("Created trainer with ID: {}", created.getId());
         return created;
@@ -40,7 +40,10 @@ public class TrainerService {
 
     public boolean update(Trainer trainer) {
         LOGGER.debug("Updating trainer with ID: {}", trainer.getId());
-        boolean updated = trainerDao.update(trainer);
+        Trainer stored = findById(trainer.getId());
+        stored.updateProfile(trainer.getFirstName(), trainer.getLastName(),
+                trainer.getSpecialization());
+        boolean updated = trainerDao.update(stored);
         if (updated) {
             LOGGER.info("Updated trainer with ID: {}", trainer.getId());
         }

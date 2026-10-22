@@ -1,7 +1,8 @@
 package kz.olzhas.model;
 
-public abstract class User {
+import java.util.Objects;
 
+public abstract class User {
     private Long id;
     private String firstName;
     private String lastName;
@@ -9,9 +10,11 @@ public abstract class User {
     private String password;
     private boolean active;
 
-    public User() {}
+    protected User(String firstName, String lastName, boolean active) {
+        this(null, firstName, lastName, null, null, active);
+    }
 
-    public User(
+    protected User(
             Long id,
             String firstName,
             String lastName,
@@ -26,51 +29,58 @@ public abstract class User {
         this.active = active;
     }
 
-    public Long getId() {
-        return id;
+    public void assignId(long id) {
+        if (this.id != null) {
+            throw new IllegalStateException("ID is already assigned");
+        }
+        if (id <= 0) {
+            throw new IllegalArgumentException("ID must be positive");
+        }
+        this.id = id;
     }
 
-    public void setId(Long id) {
-        this.id = id;
+    public void assignCredentials(String username, String password) {
+        if (this.username != null || this.password != null) {
+            throw new IllegalStateException("Credentials are already assigned");
+        }
+        this.username = Objects.requireNonNull(username, "username");
+        this.password = Objects.requireNonNull(password, "password");
+    }
+
+    protected void rename(String firstName, String lastName) {
+        this.firstName = firstName;
+        this.lastName = lastName;
+    }
+
+    public void activate() {
+        this.active = true;
+    }
+
+    public void deactivate() {
+        this.active = false;
+    }
+
+    public Long getId() {
+        return id;
     }
 
     public String getFirstName() {
         return firstName;
     }
 
-    public void setFirstName(String firstName) {
-        this.firstName = firstName;
-    }
-
     public String getLastName() {
         return lastName;
-    }
-
-    public void setLastName(String lastName) {
-        this.lastName = lastName;
     }
 
     public String getUsername() {
         return username;
     }
 
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
     public String getPassword() {
         return password;
     }
 
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
     public boolean isActive() {
         return active;
-    }
-
-    public void setActive(boolean active) {
-        this.active = active;
     }
 }

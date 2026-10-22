@@ -1,23 +1,18 @@
 package kz.olzhas;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
-import static org.junit.Assert.fail;
 
 import kz.olzhas.component.StorageInitializer;
-import kz.olzhas.config.AppConfig;
 import kz.olzhas.model.Trainee;
 import kz.olzhas.model.Trainer;
 import kz.olzhas.model.Training;
-import kz.olzhas.service.GymService;
 
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.io.DefaultResourceLoader;
 
 import java.io.File;
@@ -45,7 +40,7 @@ public class StorageInitializerTest {
         Properties seed = new Properties();
         try (Reader reader =
                 new InputStreamReader(
-                        getClass().getResourceAsStream("/seed-data.properties"),
+                        getClass().getResourceAsStream("/test-seed-data.properties"),
                         StandardCharsets.UTF_8)) {
             seed.load(reader);
         }
@@ -62,7 +57,7 @@ public class StorageInitializerTest {
 
     @Test
     public void postProcessorInitializesOnlyStorageBeans() {
-        StorageInitializer initializer = initializer("classpath:seed-data.properties");
+        StorageInitializer initializer = initializer("classpath:test-seed-data.properties");
         Object unrelated = new Object();
         assertSame(unrelated, initializer.postProcessAfterInitialization(unrelated, "other"));
         assertSame(unrelated, initializer.postProcessAfterInitialization(unrelated, "traineeStorage"));
@@ -77,9 +72,9 @@ public class StorageInitializerTest {
         assertSame(trainees, initializer.postProcessAfterInitialization(trainees, "traineeStorage"));
         assertSame(trainers, initializer.postProcessAfterInitialization(trainers, "trainerStorage"));
         assertSame(trainings, initializer.postProcessAfterInitialization(trainings, "trainingStorage"));
-        assertEquals("John.Smith", trainees.get(1L).getUsername());
-        assertEquals("Jane.Doe", trainers.get(1L).getUsername());
-        assertEquals(java.time.Duration.ofMinutes(60), trainings.get(1L).getTrainingDuration());
+        assertEquals("Test.Member", trainees.get(41L).getUsername());
+        assertEquals("Test.Coach", trainers.get(71L).getUsername());
+        assertEquals(java.time.Duration.ofMinutes(35), trainings.get(91L).getTrainingDuration());
         assertEquals(1, trainees.size());
         assertEquals(1, trainers.size());
         assertEquals(1, trainings.size());
@@ -93,9 +88,9 @@ public class StorageInitializerTest {
         properties.remove("trainee.1.address");
         Map<Long, Trainee> storage = new LinkedHashMap<>();
         initializer(file(properties)).postProcessAfterInitialization(storage, "traineeStorage");
-        assertEquals("Әлия", storage.get(1L).getFirstName());
-        assertNull(storage.get(1L).getDateOfBirth());
-        assertNull(storage.get(1L).getAddress());
+        assertEquals("Әлия", storage.get(41L).getFirstName());
+        assertNull(storage.get(41L).getDateOfBirth());
+        assertNull(storage.get(41L).getAddress());
     }
 
     @Test
@@ -116,43 +111,10 @@ public class StorageInitializerTest {
     }
 
     @Test
-    public void configuredExternalPathIsUsedBySpring() throws IOException {
-        Properties properties = seed();
-        properties.setProperty("trainee.1.address", "External address");
-        try (AnnotationConfigApplicationContext context =
-                new AnnotationConfigApplicationContext()) {
-            context.getEnvironment()
-                    .getPropertySources()
-                    .addFirst(
-                            new MapPropertySource(
-                                    "test", Map.of("gym.storage.data.path", file(properties))));
-            context.register(AppConfig.class);
-            context.refresh();
-            assertEquals(
-                    "External address",
-                    context.getBean(GymService.class).selectTrainee(1).getAddress());
-        }
-    }
-
-    @Test
-    public void missingFileFailsStartup() {
-        try (AnnotationConfigApplicationContext context =
-                new AnnotationConfigApplicationContext()) {
-            context.getEnvironment()
-                    .getPropertySources()
-                    .addFirst(
-                            new MapPropertySource(
-                                    "test",
-                                    Map.of(
-                                            "gym.storage.data.path",
-                                            "classpath:missing-seed.properties")));
-            context.register(AppConfig.class);
-            try {
-                context.refresh();
-                fail("Missing file must prevent startup");
-            } catch (org.springframework.beans.BeansException expected) {
-                assertNotNull(expected.getCause());
-            }
-        }
+    public void missingFileFailsWhenAStorageMapIsInitialized() {
+        StorageInitializer initializer = initializer("classpath:missing-test-seed.properties");
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+                () -> initializer.postProcessAfterInitialization(new LinkedHashMap<>(), "traineeStorage"));
+        org.junit.Assert.assertTrue(exception.getCause() instanceof IOException);
     }
 }

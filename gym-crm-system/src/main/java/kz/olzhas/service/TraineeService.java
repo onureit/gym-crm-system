@@ -17,7 +17,7 @@ public class TraineeService {
     private static final Logger LOGGER = LoggerFactory.getLogger(TraineeService.class);
 
     private TraineeDao traineeDao;
-    private UserRegistry userCredentials;
+    private UserRegistry userRegistry;
 
     @Autowired
     public void setTraineeDao(TraineeDao traineeDao) {
@@ -25,14 +25,14 @@ public class TraineeService {
     }
 
     @Autowired
-    public void setUserRegistry(UserRegistry userCredentials) {
-        this.userCredentials = userCredentials;
+    public void setUserRegistry(UserRegistry userRegistry) {
+        this.userRegistry = userRegistry;
     }
 
     public Trainee create(Trainee trainee) {
-        trainee.setUsername(userCredentials.generateUserName(trainee));
-        trainee.setPassword(userCredentials.generatePassword());
-
+        trainee.assignCredentials(
+                userRegistry.generateUsername(trainee.getFirstName(), trainee.getLastName()),
+                userRegistry.generatePassword());
         Trainee created = traineeDao.create(trainee);
         LOGGER.info("Created trainee with ID: {}", created.getId());
         return created;
@@ -40,7 +40,10 @@ public class TraineeService {
 
     public boolean update(Trainee trainee) {
         LOGGER.debug("Updating trainee with ID: {}", trainee.getId());
-        boolean updated = traineeDao.update(trainee);
+        Trainee stored = findById(trainee.getId());
+        stored.updateProfile(trainee.getFirstName(), trainee.getLastName(),
+                trainee.getDateOfBirth(), trainee.getAddress());
+        boolean updated = traineeDao.update(stored);
         if (updated) {
             LOGGER.info("Updated trainee with ID: {}", trainee.getId());
         }

@@ -14,15 +14,15 @@ public abstract class AbstractInMemoryDao<T> {
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final String entityName;
     private final Function<T, Long> idGetter;
-    private final BiConsumer<T, Long> idSetter;
+    private final BiConsumer<T, Long> idAssigner;
     private Map<Long, T> storage;
     private long lastId;
 
     protected AbstractInMemoryDao(
-            String entityName, Function<T, Long> idGetter, BiConsumer<T, Long> idSetter) {
+            String entityName, Function<T, Long> idGetter, BiConsumer<T, Long> idAssigner) {
         this.entityName = entityName;
         this.idGetter = idGetter;
-        this.idSetter = idSetter;
+        this.idAssigner = idAssigner;
     }
 
     protected void setStorage(Map<Long, T> storage) {
@@ -31,7 +31,7 @@ public abstract class AbstractInMemoryDao<T> {
 
     public T create(T entity) {
         long id = generateId();
-        idSetter.accept(entity, id);
+        idAssigner.accept(entity, id);
         storage.put(id, entity);
         logger.debug("Stored {} with ID: {}", entityName, id);
         return entity;

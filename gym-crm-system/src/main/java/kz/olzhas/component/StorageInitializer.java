@@ -76,18 +76,16 @@ public class StorageInitializer implements BeanPostProcessor, ResourceLoaderAwar
         int traineeCount = Integer.parseInt(data.getProperty("trainees.count", "0"));
         for (int index = 1; index <= traineeCount; index++) {
             String prefix = "trainee." + index + ".";
-            Trainee trainee = new Trainee();
-            trainee.setId(Long.parseLong(data.getProperty(prefix + "id")));
-            trainee.setFirstName(data.getProperty(prefix + "firstName"));
-            trainee.setLastName(data.getProperty(prefix + "lastName"));
-            trainee.setUsername(data.getProperty(prefix + "username"));
-            trainee.setPassword(data.getProperty(prefix + "password"));
-            trainee.setActive(Boolean.parseBoolean(data.getProperty(prefix + "active")));
             String dateOfBirth = data.getProperty(prefix + "dateOfBirth");
-            if (dateOfBirth != null && !dateOfBirth.isBlank()) {
-                trainee.setDateOfBirth(LocalDate.parse(dateOfBirth));
-            }
-            trainee.setAddress(data.getProperty(prefix + "address"));
+            Trainee trainee = new Trainee(
+                    Long.parseLong(data.getProperty(prefix + "id")),
+                    data.getProperty(prefix + "firstName"),
+                    data.getProperty(prefix + "lastName"),
+                    data.getProperty(prefix + "username"),
+                    data.getProperty(prefix + "password"),
+                    Boolean.parseBoolean(data.getProperty(prefix + "active")),
+                    dateOfBirth == null || dateOfBirth.isBlank() ? null : LocalDate.parse(dateOfBirth),
+                    data.getProperty(prefix + "address"));
             storage.put(trainee.getId(), trainee);
         }
         LOGGER.info("Loaded " + traineeCount + " trainees");
@@ -98,14 +96,13 @@ public class StorageInitializer implements BeanPostProcessor, ResourceLoaderAwar
         int trainerCount = Integer.parseInt(data.getProperty("trainers.count", "0"));
         for (int index = 1; index <= trainerCount; index++) {
             String prefix = "trainer." + index + ".";
-            Trainer trainer = new Trainer();
-            trainer.setId(Long.parseLong(data.getProperty(prefix + "id")));
-            trainer.setFirstName(data.getProperty(prefix + "firstName"));
-            trainer.setLastName(data.getProperty(prefix + "lastName"));
-            trainer.setUsername(data.getProperty(prefix + "username"));
-            trainer.setPassword(data.getProperty(prefix + "password"));
-            trainer.setActive(Boolean.parseBoolean(data.getProperty(prefix + "active")));
-            trainer.setSpecialization(
+            Trainer trainer = new Trainer(
+                    Long.parseLong(data.getProperty(prefix + "id")),
+                    data.getProperty(prefix + "firstName"),
+                    data.getProperty(prefix + "lastName"),
+                    data.getProperty(prefix + "username"),
+                    data.getProperty(prefix + "password"),
+                    Boolean.parseBoolean(data.getProperty(prefix + "active")),
                     new TrainingType(data.getProperty(prefix + "specialization")));
             storage.put(trainer.getId(), trainer);
         }

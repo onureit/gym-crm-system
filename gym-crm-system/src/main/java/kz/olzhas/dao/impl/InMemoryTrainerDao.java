@@ -14,7 +14,7 @@ import java.util.Map;
 @Repository
 public class InMemoryTrainerDao extends AbstractInMemoryDao<Trainer> implements TrainerDao {
     public InMemoryTrainerDao() {
-        super("Trainer", Trainer::getId, Trainer::setId);
+        super("Trainer", Trainer::getId, Trainer::assignId);
     }
 
     @Override

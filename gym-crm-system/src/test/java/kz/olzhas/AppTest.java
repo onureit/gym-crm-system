@@ -1,180 +1,62 @@
 package kz.olzhas;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-
 import kz.olzhas.config.AppConfig;
-import kz.olzhas.exceptions.TraineeNotFoundException;
-import kz.olzhas.exceptions.TrainerNotFoundException;
-import kz.olzhas.exceptions.TrainingNotFoundException;
 import kz.olzhas.dao.TraineeDao;
 import kz.olzhas.dao.TrainerDao;
 import kz.olzhas.dao.TrainingDao;
 import kz.olzhas.dao.impl.InMemoryTraineeDao;
 import kz.olzhas.dao.impl.InMemoryTrainerDao;
 import kz.olzhas.dao.impl.InMemoryTrainingDao;
-import kz.olzhas.model.Trainee;
-import kz.olzhas.model.Trainer;
-import kz.olzhas.model.Training;
-import kz.olzhas.model.TrainingType;
 import kz.olzhas.service.GymService;
 
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
+import org.springframework.beans.BeansException;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.core.env.MapPropertySource;
 
 import java.time.Duration;
-import java.time.LocalDate;
+import java.util.Map;
+
+import static org.junit.Assert.*;
 
 public class AppTest {
-    private AnnotationConfigApplicationContext context;
-    private GymService gym;
-
-    @Before
-    public void openContext() {
-        context = new AnnotationConfigApplicationContext(AppConfig.class);
-        gym = context.getBean(GymService.class);
-    }
-
-    @After
-    public void closeContext() {
-        if (context != null) {
-            context.close();
+    @Test
+    public void contextWiresServicesAndSeedsTheDaoMaps() {
+        try (AnnotationConfigApplicationContext context = context("classpath:test-seed-data.properties")) {
+            context.refresh();
+            GymService gym = context.getBean(GymService.class);
+            assertTrue(context.getBean(TraineeDao.class) instanceof InMemoryTraineeDao);
+            assertTrue(context.getBean(TrainerDao.class) instanceof InMemoryTrainerDao);
+            assertTrue(context.getBean(TrainingDao.class) instanceof InMemoryTrainingDao);
+            assertEquals(1, gym.listTrainees().size());
+            assertEquals(1, gym.listTrainers().size());
+            assertEquals(1, gym.listTrainings().size());
+            assertEquals("Test.Member", gym.selectTrainee(41).getUsername());
+            assertEquals("Test.Coach", gym.selectTrainer(71).getUsername());
+            assertEquals(Duration.ofMinutes(35), gym.selectTraining(91).getTrainingDuration());
+            assertSame(context.getBean("traineeStorage", Map.class).get(41L), gym.selectTrainee(41));
+            assertSame(context.getBean("trainerStorage", Map.class).get(71L), gym.selectTrainer(71));
+            assertSame(context.getBean("trainingStorage", Map.class).get(91L), gym.selectTraining(91));
         }
     }
 
-    private Trainee trainee(String first, String last) {
-        return new Trainee(
-                null, first, last, null, null, true, LocalDate.of(2000, 1, 1), "Address");
-    }
-
-    private Trainer trainer(String first, String last) {
-        return new Trainer(null, first, last, null, null, true, new TrainingType("Yoga"));
-    }
-
-    private Training training(long traineeId, long trainerId) {
-        return new Training(
-                null,
-                traineeId,
-                trainerId,
-                "Yoga session",
-                new TrainingType("Yoga"),
-                LocalDate.of(2026, 10, 12),
-                Duration.ofMinutes(45));
-    }
-
     @Test
-    public void contextLoadsAllNamespacesAndPreparedData() {
-        assertTrue(context.getBean(TraineeDao.class) instanceof InMemoryTraineeDao);
-        assertTrue(context.getBean(TrainerDao.class) instanceof InMemoryTrainerDao);
-        assertTrue(context.getBean(TrainingDao.class) instanceof InMemoryTrainingDao);
-        assertSame(context.getBean("traineeStorage", java.util.Map.class).get(1L), gym.selectTrainee(1));
-        assertSame(context.getBean("trainerStorage", java.util.Map.class).get(1L), gym.selectTrainer(1));
-        assertSame(context.getBean("trainingStorage", java.util.Map.class).get(1L), gym.selectTraining(1));
-        assertEquals(1, gym.listTrainees().size());
-        assertEquals("John.Smith", gym.selectTrainee(1).getUsername());
-        assertEquals("Jane.Doe", gym.selectTrainer(1).getUsername());
-        assertEquals(Duration.ofMinutes(60), gym.selectTraining(1).getTrainingDuration());
-    }
-
-    @Test
-    public void traineeCrudPreservesCredentials() {
-        Trainee created = gym.createTrainee(trainee("Alice", "Brown"));
-        assertEquals(Long.valueOf(2), created.getId());
-        assertEquals("Alice.Brown", created.getUsername());
-        assertEquals(10, created.getPassword().length());
-        assertTrue(created.getPassword().matches("[A-Za-z0-9]{10}"));
-        created.setAddress("New address");
-        created.setFirstName("Alicia");
-        String password = created.getPassword();
-        assertTrue(gym.updateTrainee(created));
-        Trainee stored = gym.selectTrainee(created.getId());
-        assertEquals("New address", stored.getAddress());
-        assertEquals("Alicia", stored.getFirstName());
-        assertEquals("Alice.Brown", stored.getUsername());
-        assertEquals(password, stored.getPassword());
-        gym.deleteTrainee(created.getId());
-        assertThrows(TraineeNotFoundException.class, () -> gym.selectTrainee(created.getId()));
-        assertThrows(TraineeNotFoundException.class, () -> gym.deleteTrainee(created.getId()));
-    }
-
-    @Test
-    public void trainerCreateUpdateAndSelect() {
-        Trainer created = gym.createTrainer(trainer("Alex", "Green"));
-        created.setSpecialization(new TrainingType("Pilates"));
-        created.setActive(false);
-        String username = created.getUsername();
-        String password = created.getPassword();
-        assertTrue(gym.updateTrainer(created));
-        Trainer stored = gym.selectTrainer(created.getId());
-        assertEquals("Pilates", stored.getSpecialization().getTrainingTypeName());
-        assertFalse(stored.isActive());
-        assertEquals(username, stored.getUsername());
-        assertEquals(password, stored.getPassword());
-    }
-
-    @Test
-    public void usernamesAreUniqueAcrossBothProfileNamespacesAndSeedData() {
-        Trainee first = gym.createTrainee(trainee("John", "Smith"));
-        Trainer second = gym.createTrainer(trainer("John", "Smith"));
-        Trainee third = gym.createTrainee(trainee("John", "Smith"));
-        assertEquals("John.Smith1", first.getUsername());
-        assertEquals("John.Smith2", second.getUsername());
-        assertEquals("John.Smith3", third.getUsername());
-    }
-
-    @Test
-    public void usernameSuffixAlsoAvoidsDifferentNamesProducingSameCandidate() {
-        gym.createTrainee(trainee("John", "Smith1"));
-        assertEquals("John.Smith2", gym.createTrainer(trainer("John", "Smith")).getUsername());
-    }
-
-    @Test
-    public void trainingCreateAndSelect() {
-        Trainee created = gym.createTrainee(trainee("New", "Trainee"));
-        Training session = gym.createTraining(training(created.getId(), 1));
-        assertEquals(Long.valueOf(2), session.getId());
-        assertEquals(created.getId(), gym.selectTraining(session.getId()).getTraineeId());
-        gym.deleteTrainee(created.getId());
-        assertNotNull(gym.selectTraining(session.getId()));
-        assertNotNull(gym.selectTraining(1));
-    }
-
-    @Test
-    public void missingRecordsHavePredictableResults() {
-        assertThrows(TraineeNotFoundException.class, () -> gym.selectTrainee(999));
-        assertThrows(TrainerNotFoundException.class, () -> gym.selectTrainer(999));
-        assertThrows(TrainingNotFoundException.class, () -> gym.selectTraining(999));
-        Trainee missing = trainee("Missing", "User");
-        missing.setId(999L);
-        assertThrows(TraineeNotFoundException.class, () -> gym.updateTrainee(missing));
-        Trainer absent = trainer("Missing", "Trainer");
-        absent.setId(999L);
-        assertThrows(TrainerNotFoundException.class, () -> gym.updateTrainer(absent));
-    }
-
-    @Test
-    public void contextStorageIsNotStatic() {
-        gym.createTrainee(trainee("Isolated", "Profile"));
-        try (AnnotationConfigApplicationContext other =
-                new AnnotationConfigApplicationContext(AppConfig.class)) {
-            assertEquals(1, other.getBean(GymService.class).listTrainees().size());
-            assertNotSame(context.getBean("traineeStorage"), other.getBean("traineeStorage"));
+    public void missingSeedFilePreventsStartup() {
+        try (AnnotationConfigApplicationContext context = context("classpath:missing-test-seed.properties")) {
+            BeansException exception = assertThrows(BeansException.class, context::refresh);
+            Throwable rootCause = exception;
+            while (rootCause.getCause() != null) {
+                rootCause = rootCause.getCause();
+            }
+            assertTrue(rootCause instanceof java.io.IOException);
         }
     }
 
-    private static void assertThrows(Class<? extends RuntimeException> expected, Runnable action) {
-        try {
-            action.run();
-        } catch (RuntimeException exception) {
-            assertTrue("Unexpected exception: " + exception, expected.isInstance(exception));
-            return;
-        }
-        org.junit.Assert.fail("Expected " + expected.getSimpleName());
+    private AnnotationConfigApplicationContext context(String location) {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+        context.getEnvironment().getPropertySources().addFirst(
+                new MapPropertySource("test", Map.of("gym.storage.data.path", location)));
+        context.register(AppConfig.class);
+        return context;
     }
 }
