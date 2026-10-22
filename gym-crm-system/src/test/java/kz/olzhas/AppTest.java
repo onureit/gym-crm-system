@@ -7,7 +7,6 @@ import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
-import kz.olzhas.component.InMemoryStorage;
 import kz.olzhas.config.AppConfig;
 import kz.olzhas.exceptions.TraineeNotFoundException;
 import kz.olzhas.exceptions.TrainerNotFoundException;
@@ -74,10 +73,9 @@ public class AppTest {
         assertTrue(context.getBean(TraineeDao.class) instanceof InMemoryTraineeDao);
         assertTrue(context.getBean(TrainerDao.class) instanceof InMemoryTrainerDao);
         assertTrue(context.getBean(TrainingDao.class) instanceof InMemoryTrainingDao);
-        InMemoryStorage storage = context.getBean(InMemoryStorage.class);
-        assertSame(context.getBean("traineeStorage"), storage.getTrainees());
-        assertSame(context.getBean("trainerStorage"), storage.getTrainers());
-        assertSame(context.getBean("trainingStorage"), storage.getTrainings());
+        assertSame(context.getBean("traineeStorage", java.util.Map.class).get(1L), gym.selectTrainee(1));
+        assertSame(context.getBean("trainerStorage", java.util.Map.class).get(1L), gym.selectTrainer(1));
+        assertSame(context.getBean("trainingStorage", java.util.Map.class).get(1L), gym.selectTraining(1));
         assertEquals(1, gym.listTrainees().size());
         assertEquals("John.Smith", gym.selectTrainee(1).getUsername());
         assertEquals("Jane.Doe", gym.selectTrainer(1).getUsername());

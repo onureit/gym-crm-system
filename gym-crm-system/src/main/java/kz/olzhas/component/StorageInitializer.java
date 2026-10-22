@@ -16,6 +16,7 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Logger;
 
@@ -24,6 +25,7 @@ public class StorageInitializer implements BeanPostProcessor, ResourceLoaderAwar
 
     private String dataLocation;
     private ResourceLoader resourceLoader;
+    private Properties seedData;
 
     @Value("${gym.storage.data.path}")
     public void setDataLocation(String dataLocation) {
@@ -36,15 +38,25 @@ public class StorageInitializer implements BeanPostProcessor, ResourceLoaderAwar
     }
 
     @Override
-    public Object postProcessBeforeInitialization(Object bean, String beanName) {
-        if (bean instanceof InMemoryStorage storage) {
-            initialize(storage);
+    @SuppressWarnings("unchecked")
+    public Object postProcessAfterInitialization(Object bean, String beanName) {
+        if (!(bean instanceof Map<?, ?>)) {
+            return bean;
         }
-        
+
+        switch (beanName) {
+            case "traineeStorage" -> initializeTrainees((Map<Long, Trainee>) bean);
+            case "trainerStorage" -> initializeTrainers((Map<Long, Trainer>) bean);
+            case "trainingStorage" -> initializeTrainings((Map<Long, Training>) bean);
+        }
+
         return bean;
     }
 
-    public void initialize(InMemoryStorage storage) {
+    private Properties loadSeedData() {
+        if (seedData != null) {
+            return seedData;
+        }
         Properties data = new Properties();
         try (Reader reader =
                 new InputStreamReader(
@@ -55,7 +67,12 @@ public class StorageInitializer implements BeanPostProcessor, ResourceLoaderAwar
             throw new IllegalStateException(
                     "Cannot read storage data from " + dataLocation, exception);
         }
+        seedData = data;
+        return seedData;
+    }
 
+    private void initializeTrainees(Map<Long, Trainee> storage) {
+        Properties data = loadSeedData();
         int traineeCount = Integer.parseInt(data.getProperty("trainees.count", "0"));
         for (int index = 1; index <= traineeCount; index++) {
             String prefix = "trainee." + index + ".";
@@ -71,9 +88,13 @@ public class StorageInitializer implements BeanPostProcessor, ResourceLoaderAwar
                 trainee.setDateOfBirth(LocalDate.parse(dateOfBirth));
             }
             trainee.setAddress(data.getProperty(prefix + "address"));
-            storage.getTrainees().put(trainee.getId(), trainee);
+            storage.put(trainee.getId(), trainee);
         }
+        LOGGER.info("Loaded " + traineeCount + " trainees");
+    }
 
+    private void initializeTrainers(Map<Long, Trainer> storage) {
+        Properties data = loadSeedData();
         int trainerCount = Integer.parseInt(data.getProperty("trainers.count", "0"));
         for (int index = 1; index <= trainerCount; index++) {
             String prefix = "trainer." + index + ".";
@@ -86,9 +107,13 @@ public class StorageInitializer implements BeanPostProcessor, ResourceLoaderAwar
             trainer.setActive(Boolean.parseBoolean(data.getProperty(prefix + "active")));
             trainer.setSpecialization(
                     new TrainingType(data.getProperty(prefix + "specialization")));
-            storage.getTrainers().put(trainer.getId(), trainer);
+            storage.put(trainer.getId(), trainer);
         }
+        LOGGER.info("Loaded " + trainerCount + " trainers");
+    }
 
+    private void initializeTrainings(Map<Long, Training> storage) {
+        Properties data = loadSeedData();
         int trainingCount = Integer.parseInt(data.getProperty("trainings.count", "0"));
         for (int index = 1; index <= trainingCount; index++) {
             String prefix = "training." + index + ".";
@@ -102,16 +127,9 @@ public class StorageInitializer implements BeanPostProcessor, ResourceLoaderAwar
             training.setTrainingDuration(
                     Duration.ofMinutes(
                             Long.parseLong(data.getProperty(prefix + "durationMinutes"))));
-            storage.getTrainings().put(training.getId(), training);
+            storage.put(training.getId(), training);
         }
 
-        LOGGER.info(
-                "Loaded "
-                        + traineeCount
-                        + " trainees, "
-                        + trainerCount
-                        + " trainers, "
-                        + trainingCount
-                        + " trainings");
+        LOGGER.info("Loaded " + trainingCount + " trainings");
     }
 }
