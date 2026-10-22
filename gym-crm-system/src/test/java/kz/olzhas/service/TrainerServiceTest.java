@@ -76,11 +76,11 @@ public class TrainerServiceTest {
         when(dao.findById(42L)).thenReturn(Optional.of(stored));
         when(dao.update(stored)).thenReturn(true);
 
-        assertTrue(service.update(new Trainer(42L, "Alicia", "Brown", "Injected", "Injected", false, new TrainingType("Pilates"))));
+        assertTrue(service.update(new Trainer(42L, "Alicia", "Brown", "Injected", "Injected", false, TrainingType.AEROBICA)));
 
         assertEquals("Alicia", stored.getFirstName());
         assertEquals("Brown", stored.getLastName());
-        assertEquals("Pilates", stored.getSpecialization().getTrainingTypeName());
+        assertEquals(TrainingType.AEROBICA, stored.getSpecialization());
         assertEquals("Alex.Smith", stored.getUsername());
         assertEquals("Abcdef1234", stored.getPassword());
         assertTrue(stored.isActive());
@@ -125,11 +125,11 @@ public class TrainerServiceTest {
     }
 
     private Trainer draft() {
-        return new Trainer("Alex", "Smith", true, new TrainingType("Yoga"));
+        return new Trainer("Alex", "Smith", true, TrainingType.YOGA);
     }
 
     private Trainer profile(Long id) {
         return new Trainer(id, "Alex", "Smith", "Alex.Smith", "Abcdef1234", true,
-                new TrainingType("Yoga"));
+                TrainingType.YOGA);
     }
 }

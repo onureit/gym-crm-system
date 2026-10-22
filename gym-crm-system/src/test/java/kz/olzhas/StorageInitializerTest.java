@@ -9,6 +9,7 @@ import kz.olzhas.component.StorageInitializer;
 import kz.olzhas.model.Trainee;
 import kz.olzhas.model.Trainer;
 import kz.olzhas.model.Training;
+import kz.olzhas.model.TrainingType;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -91,6 +92,32 @@ public class StorageInitializerTest {
         assertEquals("Әлия", storage.get(41L).getFirstName());
         assertNull(storage.get(41L).getDateOfBirth());
         assertNull(storage.get(41L).getAddress());
+    }
+
+    @Test
+    public void seedTrainingTypesAreParsedAsEnumsIgnoringCaseAndWhitespace() throws IOException {
+        Properties properties = seed();
+        properties.setProperty("trainer.1.specialization", " lifting ");
+        properties.setProperty("training.1.type", "Aerobica");
+        StorageInitializer initializer = initializer(file(properties));
+        Map<Long, Trainer> trainers = new LinkedHashMap<>();
+        Map<Long, Training> trainings = new LinkedHashMap<>();
+
+        initializer.postProcessAfterInitialization(trainers, "trainerStorage");
+        initializer.postProcessAfterInitialization(trainings, "trainingStorage");
+
+        assertEquals(TrainingType.LIFTING, trainers.get(71L).getSpecialization());
+        assertEquals(TrainingType.AEROBICA, trainings.get(91L).getTrainingType());
+    }
+
+    @Test
+    public void unknownTrainingTypeIsRejected() throws IOException {
+        Properties properties = seed();
+        properties.setProperty("training.1.type", "Unknown");
+        StorageInitializer initializer = initializer(file(properties));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> initializer.postProcessAfterInitialization(new LinkedHashMap<>(), "trainingStorage"));
     }
 
     @Test

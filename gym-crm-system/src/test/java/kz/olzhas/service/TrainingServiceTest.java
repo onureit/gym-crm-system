@@ -136,7 +136,7 @@ public class TrainingServiceTest {
     }
 
     private Training training(Long id, Long traineeId, Long trainerId) {
-        return new Training(id, traineeId, trainerId, "Test session", new TrainingType("Yoga"),
+        return new Training(id, traineeId, trainerId, "Test session", TrainingType.YOGA,
                 LocalDate.of(2026, 1, 2), Duration.ofMinutes(45));
     }
 }

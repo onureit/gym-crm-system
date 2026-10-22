@@ -58,6 +58,6 @@ public class UserRegistryTest {
     }
 
     private Trainer trainer(String username) {
-        return new Trainer(2L, "Alex", "Smith", username, "Pass123456", true, new TrainingType("Yoga"));
+        return new Trainer(2L, "Alex", "Smith", username, "Pass123456", true, TrainingType.YOGA);
     }
 }

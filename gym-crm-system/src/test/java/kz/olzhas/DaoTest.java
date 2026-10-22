@@ -120,7 +120,7 @@ public class DaoTest {
 
     @Test
     public void trainerCreateAssignsFirstId() {
-        Trainer created = trainerDao.create(trainer(null, "Yoga"));
+        Trainer created = trainerDao.create(trainer(null, TrainingType.YOGA));
 
         assertEquals(Long.valueOf(1), created.getId());
         assertSame(created, trainers.get(1L));
@@ -128,8 +128,8 @@ public class DaoTest {
 
     @Test
     public void trainerUpdateReplacesTheStoredProfile() {
-        trainers.put(31L, trainer(31L, "Yoga"));
-        Trainer changed = trainer(31L, "Pilates");
+        trainers.put(31L, trainer(31L, TrainingType.YOGA));
+        Trainer changed = trainer(31L, TrainingType.AEROBICA);
 
         assertTrue(trainerDao.update(changed));
 
@@ -138,12 +138,12 @@ public class DaoTest {
 
     @Test
     public void trainerUpdateMissingProfileThrows() {
-        assertThrows(TrainerNotFoundException.class, () -> trainerDao.update(trainer(999L, "Yoga")));
+        assertThrows(TrainerNotFoundException.class, () -> trainerDao.update(trainer(999L, TrainingType.YOGA)));
     }
 
     @Test
     public void trainerFindByIdReturnsStoredProfile() {
-        Trainer stored = trainer(31L, "Yoga");
+        Trainer stored = trainer(31L, TrainingType.YOGA);
         trainers.put(31L, stored);
 
         assertSame(stored, trainerDao.findById(31L).orElseThrow());
@@ -156,7 +156,7 @@ public class DaoTest {
 
     @Test
     public void trainerFindAllReturnsStoredProfiles() {
-        Trainer stored = trainer(31L, "Yoga");
+        Trainer stored = trainer(31L, TrainingType.YOGA);
         trainers.put(31L, stored);
 
         assertEquals(List.of(stored), trainerDao.findAll());
@@ -195,13 +195,13 @@ public class DaoTest {
         return new Trainee(id, "New", "User", "New.User", "Abcdef1234", true, null, address);
     }
 
-    private Trainer trainer(Long id, String specialization) {
+    private Trainer trainer(Long id, TrainingType specialization) {
         return new Trainer(id, "Alex", "Smith", "Alex.Smith", "Abcdef1234", true,
-                new TrainingType(specialization));
+                specialization);
     }
 
     private Training training(Long id) {
-        return new Training(id, 21L, 31L, "Session", new TrainingType("Yoga"),
+        return new Training(id, 21L, 31L, "Session", TrainingType.YOGA,
                 LocalDate.of(2026, 1, 2), Duration.ofMinutes(30));
     }
 }

@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Map;
+import java.util.Locale;
 import java.util.Properties;
 import java.util.logging.Logger;
 
@@ -103,7 +104,7 @@ public class StorageInitializer implements BeanPostProcessor, ResourceLoaderAwar
                     data.getProperty(prefix + "username"),
                     data.getProperty(prefix + "password"),
                     Boolean.parseBoolean(data.getProperty(prefix + "active")),
-                    new TrainingType(data.getProperty(prefix + "specialization")));
+                    TrainingType.valueOf(data.getProperty(prefix + "specialization").trim().toUpperCase(Locale.ROOT)));
             storage.put(trainer.getId(), trainer);
         }
         LOGGER.info("Loaded " + trainerCount + " trainers");
@@ -119,7 +120,7 @@ public class StorageInitializer implements BeanPostProcessor, ResourceLoaderAwar
             training.setTraineeId(Long.parseLong(data.getProperty(prefix + "traineeId")));
             training.setTrainerId(Long.parseLong(data.getProperty(prefix + "trainerId")));
             training.setTrainingName(data.getProperty(prefix + "name"));
-            training.setTrainingType(new TrainingType(data.getProperty(prefix + "type")));
+            training.setTrainingType(TrainingType.valueOf(data.getProperty(prefix + "type").trim().toUpperCase(Locale.ROOT)));
             training.setTrainingDate(LocalDate.parse(data.getProperty(prefix + "date")));
             training.setTrainingDuration(
                     Duration.ofMinutes(

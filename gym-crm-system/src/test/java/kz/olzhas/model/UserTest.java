@@ -52,12 +52,12 @@ public class UserTest {
 
     @Test
     public void trainerUpdateProfileChangesSpecialization() {
-        Trainer trainer = new Trainer("Alex", "Smith", true, new TrainingType("Yoga"));
+        Trainer trainer = new Trainer("Alex", "Smith", true, TrainingType.YOGA);
 
-        trainer.updateProfile("Alex", "Brown", new TrainingType("Pilates"));
+        trainer.updateProfile("Alex", "Brown", TrainingType.AEROBICA);
 
         assertEquals("Brown", trainer.getLastName());
-        assertEquals("Pilates", trainer.getSpecialization().getTrainingTypeName());
+        assertEquals(TrainingType.AEROBICA, trainer.getSpecialization());
     }
 
     @Test
