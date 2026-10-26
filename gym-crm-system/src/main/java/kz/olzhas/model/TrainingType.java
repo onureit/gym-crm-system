@@ -1,21 +1,26 @@
 package kz.olzhas.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import org.hibernate.annotations.Immutable;
+
 @Entity
-@Table (name = "training_type")
+@Immutable
+@Table(name = "training_type")
 public class TrainingType {
     @Id
-    @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     @Column(name = "name", nullable = false, unique = true)
     private String name;
 
-    public TrainingType() {
+    protected TrainingType() {
     }
 
     public TrainingType(Long id, String name) {
@@ -27,16 +32,7 @@ public class TrainingType {
         return id;
     }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
-
     public String getName() {
         return name;
     }
-
-    public void setName(String name) {
-        this.name = name;
-    }
 }
-

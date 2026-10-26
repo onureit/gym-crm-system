@@ -1,70 +1,89 @@
 package kz.olzhas.service;
 
-import kz.olzhas.dao.TraineeDao;
 import kz.olzhas.dao.TrainerDao;
 import kz.olzhas.dao.TrainingDao;
-import kz.olzhas.exceptions.TrainingNotFoundException;
+import kz.olzhas.dao.TrainingTypeDao;
+import kz.olzhas.exceptions.TrainerNotFoundException;
+import kz.olzhas.exceptions.ValidationException;
+import kz.olzhas.model.Trainee;
+import kz.olzhas.model.Trainer;
 import kz.olzhas.model.Training;
+import kz.olzhas.model.TrainingType;
+import kz.olzhas.util.Validator;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
+@Transactional
 public class TrainingService {
     private static final Logger LOGGER = LoggerFactory.getLogger(TrainingService.class);
 
-    private TrainingDao trainingDao;
-    private TrainerDao trainerDao;
-    private TraineeDao traineeDao;
+    private final TrainingDao trainingDao;
+    private final TrainerDao trainerDao;
+    private final TrainingTypeDao trainingTypeDao;
+    private final AuthenticationService authenticationService;
 
-    @Autowired
-    public void setTrainingDao(TrainingDao trainingDao) {
+    public TrainingService(TrainingDao trainingDao, TrainerDao trainerDao,
+            TrainingTypeDao trainingTypeDao, AuthenticationService authenticationService) {
         this.trainingDao = trainingDao;
-    }
-
-    @Autowired
-    public void setTrainerDao(TrainerDao trainerDao) {
         this.trainerDao = trainerDao;
+        this.trainingTypeDao = trainingTypeDao;
+        this.authenticationService = authenticationService;
     }
 
-    @Autowired
-    public void setTraineeDao(TraineeDao traineeDao) {
-        this.traineeDao = traineeDao;
-    }
+    public Training create(String traineeUsername, String password, String trainerUsername,
+            String trainingName, String trainingType, LocalDate trainingDate, Integer duration) {
+        Trainee trainee = authenticationService.authenticateTrainee(traineeUsername, password);
+        String trainerName = Validator.requireText(trainerUsername, "Trainer username");
+        String name = Validator.requireText(trainingName, "Training name");
+        String typeName = Validator.requireText(trainingType, "Training type");
+        LocalDate date = Validator.requireNotNull(trainingDate, "Training date");
+        int minutes = Validator.requirePositive(duration, "Training duration");
 
-    public Training create(Training training) {
-        Long traineeId = training.getTraineeId();
-        Long trainerId = training.getTrainerId();
+        Trainer trainer = trainerDao.findByUsername(trainerName).orElseThrow(() -> {
+            LOGGER.warn("Trainer {} does not exist", trainerName);
 
-        if (traineeId != null && traineeDao.findById(traineeId).isEmpty()) {
-            LOGGER.warn("Trainee with ID {} does not exist", traineeId);
-            throw new IllegalArgumentException("Trainee with ID " + traineeId + " does not exist.");
-        }
+            return new TrainerNotFoundException("Trainer " + trainerName + " does not exist.");
+        });
+        TrainingType type = trainingTypeDao.findByName(typeName).orElseThrow(() -> {
+            LOGGER.warn("Unknown training type: {}", typeName);
 
-        if (trainerId != null && trainerDao.findById(trainerId).isEmpty()) {
-            LOGGER.warn("Trainer with ID {} does not exist", trainerId);
-            throw new IllegalArgumentException("Trainer with ID " + trainerId + " does not exist.");
-        }
+            return new ValidationException("Unknown training type: " + typeName);
+        });
 
+        Training training = new Training(null, trainee, trainer, name, type, date, minutes);
         Training created = trainingDao.create(training);
-        LOGGER.info("Created training with ID: {}", created.getId());
+        LOGGER.info("Created training '{}' for trainee {} with trainer {}",
+                name, traineeUsername, trainerName);
+
         return created;
     }
 
-    public Training findById(long id) {
-        LOGGER.debug("Finding training with ID: {}", id);
-        return trainingDao.findById(id).orElseThrow(() -> {
-            LOGGER.warn("Training with ID {} does not exist", id);
-            return new TrainingNotFoundException("Training with ID " + id + " does not exist.");
-        });
+    @Transactional(readOnly = true)
+    public List<Training> getTraineeTrainings(String username, String password,
+            LocalDate fromDate, LocalDate toDate, String trainerName, String trainingType) {
+        authenticationService.authenticateTrainee(username, password);
+        List<Training> trainings = trainingDao.findTraineeTrainings(
+                username, fromDate, toDate, trainerName, trainingType);
+        LOGGER.debug("Found {} trainings for trainee {}", trainings.size(), username);
+
+        return trainings;
     }
 
-    public List<Training> findAll() {
-        LOGGER.debug("Finding all trainings");
-        return trainingDao.findAll();
+    @Transactional(readOnly = true)
+    public List<Training> getTrainerTrainings(String username, String password,
+            LocalDate fromDate, LocalDate toDate, String traineeName) {
+        authenticationService.authenticateTrainer(username, password);
+        List<Training> trainings = trainingDao.findTrainerTrainings(
+                username, fromDate, toDate, traineeName);
+        LOGGER.debug("Found {} trainings for trainer {}", trainings.size(), username);
+
+        return trainings;
     }
 }

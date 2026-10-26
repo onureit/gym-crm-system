@@ -2,17 +2,14 @@ package kz.olzhas.dao;
 
 import kz.olzhas.model.Trainee;
 
-import java.util.List;
 import java.util.Optional;
 
 public interface TraineeDao {
     Trainee create(Trainee trainee);
 
-    boolean update(Trainee trainee);
+    Trainee update(Trainee trainee);
 
-    void delete(long id);
+    void delete(Trainee trainee);
 
-    Optional<Trainee> findById(long id);
-
-    List<Trainee> findAll();
+    Optional<Trainee> findByUsername(String username);
 }

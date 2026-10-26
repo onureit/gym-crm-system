@@ -44,16 +44,19 @@ public class AppConfig {
         config.setUsername(username);
         config.setPassword(password);
         config.setMaximumPoolSize(maxPoolSize);
+
         return new HikariDataSource(config);
     }
 
     @Bean
     public LocalContainerEntityManagerFactoryBean entityManagerFactory(
             DataSource dataSource,
+            @Value("${hibernate.default_schema}") String defaultSchema,
             @Value("${hibernate.hbm2ddl.auto}") String hbm2ddl,
             @Value("${hibernate.show_sql}") String showSql,
             @Value("${hibernate.format_sql}") String formatSql) {
         Properties jpaProperties = new Properties();
+        jpaProperties.setProperty("hibernate.default_schema", defaultSchema);
         jpaProperties.setProperty("hibernate.hbm2ddl.auto", hbm2ddl);
         jpaProperties.setProperty("hibernate.show_sql", showSql);
         jpaProperties.setProperty("hibernate.format_sql", formatSql);
@@ -63,6 +66,7 @@ public class AppConfig {
         factory.setPackagesToScan("kz.olzhas.model");
         factory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
         factory.setJpaProperties(jpaProperties);
+
         return factory;
     }
 
@@ -71,7 +75,6 @@ public class AppConfig {
         return new JpaTransactionManager(entityManagerFactory);
     }
 
-    /** Inserts the constant training types once Hibernate has created the schema. */
     @Bean
     @DependsOn("entityManagerFactory")
     public DataSourceInitializer trainingTypeInitializer(DataSource dataSource) {
@@ -80,6 +83,7 @@ public class AppConfig {
         DataSourceInitializer initializer = new DataSourceInitializer();
         initializer.setDataSource(dataSource);
         initializer.setDatabasePopulator(populator);
+
         return initializer;
     }
 }

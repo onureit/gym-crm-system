@@ -30,10 +30,23 @@ CREATE TABLE IF NOT EXISTS gym_crm.trainer (
 
 CREATE TABLE IF NOT EXISTS gym_crm.training (
     id BIGSERIAL PRIMARY KEY,
-    trainee_id BIGINT NOT NULL REFERENCES gym_crm.trainee(id),
+    trainee_id BIGINT NOT NULL
+        CONSTRAINT training_trainee_id_fkey REFERENCES gym_crm.trainee(id) ON DELETE CASCADE,
     trainer_id BIGINT NOT NULL REFERENCES gym_crm.trainer(id),
     training_name VARCHAR(255) NOT NULL,
     training_type_id BIGINT NOT NULL REFERENCES gym_crm.training_type(id),
     training_date DATE NOT NULL,
     training_duration INTEGER NOT NULL CHECK (training_duration > 0)
 );
+
+CREATE TABLE IF NOT EXISTS gym_crm.trainee_trainer (
+    trainee_id BIGINT NOT NULL REFERENCES gym_crm.trainee(id) ON DELETE CASCADE,
+    trainer_id BIGINT NOT NULL REFERENCES gym_crm.trainer(id),
+    PRIMARY KEY (trainee_id, trainer_id)
+);
+
+-- Migration for databases created before ON DELETE CASCADE was added (safe to re-run).
+ALTER TABLE gym_crm.training DROP CONSTRAINT IF EXISTS training_trainee_id_fkey;
+ALTER TABLE gym_crm.training
+    ADD CONSTRAINT training_trainee_id_fkey
+    FOREIGN KEY (trainee_id) REFERENCES gym_crm.trainee(id) ON DELETE CASCADE;
