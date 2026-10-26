@@ -2,11 +2,29 @@ package kz.olzhas.model;
 
 import java.time.LocalDate;
 
-public final class Trainee extends User {
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.OneToOne;
 
+@Entity
+@Table(name = "trainee")
+public class Trainee{
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column (name = "date_of_birth", nullable = true)
     private LocalDate dateOfBirth;
+    
+    @Column (name = "address", nullable = true)
     private String address;
 
+    @OneToOne
+    @JoinColumn (name = "user_id")
+    private User user;
+
+    public Trainee() {
+    }
     public Trainee(
             String firstName,
             String lastName,

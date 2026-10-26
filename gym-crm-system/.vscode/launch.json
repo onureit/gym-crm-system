@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-App<gym-crm-system>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "kz.olzhas.App",
+            "projectName": "gym-crm-system",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}

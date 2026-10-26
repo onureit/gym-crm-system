@@ -3,30 +3,56 @@ package kz.olzhas.model;
 import java.time.Duration;
 import java.time.LocalDate;
 
-public class Training {
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Id;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 
+import org.hibernate.annotations.ManyToAny;
+
+@Entity
+@Table(name = "training")
+public class Training {
+    @Id
+    @GeneratedValue (strategy = GenerationType.IDENTITY)
     private Long id;
-    private Long traineeId;
-    private Long trainerId;
+
+    @ManyToOne
+    @JoinColumn(name = "trainee_id", nullable = false, unique = true)
+    private Trainee trainee;
+
+    @ManyToOne
+    @JoinColumn(name = "trainer_id", nullable = false)
+    private Trainer trainer;
+
+    @Column(name = "training_name", nullable = false)
     private String trainingName;
+
+    @ManyToOne
+    @JoinColumn(name = "training_type_id", nullable = false)
     private TrainingType trainingType;
+
+    @Column (name = "training_date", nullable = false)
     private LocalDate trainingDate;
+
+    @Column(name = "training_duration", nullable = false, check = "training_duration > 0")
     private Duration trainingDuration;
 
     public Training() {}
 
     public Training(
             Long id,
-            Long traineeId,
-            Long trainerId,
+            Trainee trainee,
+            Trainer trainer,
             String trainingName,
             TrainingType trainingType,
             LocalDate trainingDate,
             Duration trainingDuration) {
 
         this.id = id;
-        this.traineeId = traineeId;
-        this.trainerId = trainerId;
+        this.trainee = trainee;
+        this.trainer = trainer;
         this.trainingName = trainingName;
         this.trainingType = trainingType;
         this.trainingDate = trainingDate;
@@ -41,7 +67,8 @@ public class Training {
         this.id = id;
     }
 
-    public Long getTraineeId() {
+    public 
+    Long getTraineeId() {
         return traineeId;
     }
 

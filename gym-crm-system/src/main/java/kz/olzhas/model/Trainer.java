@@ -1,13 +1,35 @@
 package kz.olzhas.model;
 
+import javax.annotation.processing.Generated;
 
-public final class Trainer extends User {
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
 
-    private TrainingType specialization;
+@Entity
+@Table (name = "trainer")
+public class Trainer {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne
+    @JoinColumn (name = "specialization_id")
+    private TrainingType trainingType;
+
+    @OneToOne
+    @JoinColumn (name = "user_id", nullable = false, unique = true)
+    private User user;
 
     public Trainer(String firstName, String lastName, boolean active, TrainingType specialization) {
         super(firstName, lastName, active);
-        this.specialization = specialization;
+        this.trainingType = specialization;
     }
 
     public Trainer(
