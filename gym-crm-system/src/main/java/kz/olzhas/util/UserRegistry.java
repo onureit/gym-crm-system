@@ -1,7 +1,6 @@
 package kz.olzhas.util;
 
-import kz.olzhas.dao.TraineeDao;
-import kz.olzhas.dao.TrainerDao;
+import kz.olzhas.dao.UserDao;
 
 import org.springframework.stereotype.Component;
 
@@ -16,12 +15,10 @@ public class UserRegistry {
     private static final int PASSWORD_LENGTH = 10;
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    private final TrainerDao trainerDao;
-    private final TraineeDao traineeDao;
+    private final UserDao userDao;
 
-    public UserRegistry(TrainerDao trainerDao, TraineeDao traineeDao) {
-        this.trainerDao = trainerDao;
-        this.traineeDao = traineeDao;
+    public UserRegistry(UserDao userDao) {
+        this.userDao = userDao;
     }
 
     public String generateUsername(String firstName, String lastName) {
@@ -29,9 +26,10 @@ public class UserRegistry {
                 + "." + Objects.requireNonNull(lastName, "lastName");
         String candidate = base;
         int suffix = 1;
-        while (usernameExists(candidate)) {
+        while (userDao.existsByUsername(candidate)) {
             candidate = base + suffix++;
         }
+
         return candidate;
     }
 
@@ -39,10 +37,5 @@ public class UserRegistry {
         return RANDOM.ints(PASSWORD_LENGTH, 0, PASSWORD_ALPHABET.length())
                 .mapToObj(index -> String.valueOf(PASSWORD_ALPHABET.charAt(index)))
                 .collect(Collectors.joining());
-    }
-
-    public boolean usernameExists(String username) {
-        return traineeDao.findAll().stream().anyMatch(t -> Objects.equals(t.getUsername(), username))
-                || trainerDao.findAll().stream().anyMatch(t -> Objects.equals(t.getUsername(), username));
     }
 }

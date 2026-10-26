@@ -2,19 +2,43 @@ package kz.olzhas.model;
 
 import java.util.Objects;
 
-public abstract class User {
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+@Entity
+@Table(name = "app_user")
+public class User {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "first_name", nullable = false)
     private String firstName;
+
+    @Column(name = "last_name", nullable = false)
     private String lastName;
+
+    @Column(name = "username", nullable = false, unique = true)
     private String username;
+
+    @Column(name = "password", nullable = false)
     private String password;
+
+    @Column(name = "is_active", nullable = false)
     private boolean active;
 
-    protected User(String firstName, String lastName, boolean active) {
+    protected User() {
+    }
+
+    public User(String firstName, String lastName, boolean active) {
         this(null, firstName, lastName, null, null, active);
     }
 
-    protected User(
+    public User(
             Long id,
             String firstName,
             String lastName,
@@ -29,16 +53,6 @@ public abstract class User {
         this.active = active;
     }
 
-    public void assignId(long id) {
-        if (this.id != null) {
-            throw new IllegalStateException("ID is already assigned");
-        }
-        if (id <= 0) {
-            throw new IllegalArgumentException("ID must be positive");
-        }
-        this.id = id;
-    }
-
     public void assignCredentials(String username, String password) {
         if (this.username != null || this.password != null) {
             throw new IllegalStateException("Credentials are already assigned");
@@ -47,17 +61,17 @@ public abstract class User {
         this.password = Objects.requireNonNull(password, "password");
     }
 
-    protected void rename(String firstName, String lastName) {
+    public void changePassword(String newPassword) {
+        this.password = Objects.requireNonNull(newPassword, "password");
+    }
+
+    public void rename(String firstName, String lastName) {
         this.firstName = firstName;
         this.lastName = lastName;
     }
 
-    public void activate() {
-        this.active = true;
-    }
-
-    public void deactivate() {
-        this.active = false;
+    public void toggleActive() {
+        this.active = !this.active;
     }
 
     public Long getId() {

@@ -1,135 +1,143 @@
 package kz.olzhas.service;
 
+import kz.olzhas.TestTypes;
 import kz.olzhas.dao.TrainerDao;
-import kz.olzhas.exceptions.TrainerNotFoundException;
+import kz.olzhas.dao.TrainingTypeDao;
+import kz.olzhas.exceptions.AuthenticationException;
+import kz.olzhas.exceptions.ValidationException;
 import kz.olzhas.model.Trainer;
-import kz.olzhas.model.TrainingType;
 import kz.olzhas.util.UserRegistry;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
-import java.util.List;
 import java.util.Optional;
 
 import static org.junit.Assert.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @RunWith(MockitoJUnitRunner.StrictStubs.class)
 public class TrainerServiceTest {
-    @Mock private TrainerDao dao;
-    @Mock private UserRegistry registry;
+    private static final String USERNAME = "Jane.Doe";
+    private static final String PASSWORD = "secret12345";
+
+    @Mock private TrainerDao trainerDao;
+    @Mock private TrainingTypeDao trainingTypeDao;
+    @Mock private AuthenticationService authenticationService;
+    @Mock private UserRegistry userRegistry;
     private TrainerService service;
+    private Trainer trainer;
 
     @Before
     public void setUp() {
-        service = new TrainerService();
-        service.setTrainerDao(dao);
-        service.setUserRegistry(registry);
+        service = new TrainerService(trainerDao, trainingTypeDao, authenticationService, userRegistry);
+        trainer = new Trainer(1L, "Jane", "Doe", USERNAME, PASSWORD, true, TestTypes.YOGA);
     }
 
     @Test
-    public void createAssignsGeneratedCredentialsBeforePersisting() {
-        Trainer draft = draft();
-        when(registry.generateUsername("Alex", "Smith")).thenReturn("Alex.Smith");
-        when(registry.generatePassword()).thenReturn("Abcdef1234");
-        when(dao.create(draft)).thenReturn(draft);
+    public void createGeneratesCredentialsAndSaves() {
+        when(trainingTypeDao.findByName("YOGA")).thenReturn(Optional.of(TestTypes.YOGA));
+        when(userRegistry.generateUsername("Jane", "Doe")).thenReturn(USERNAME);
+        when(userRegistry.generatePassword()).thenReturn(PASSWORD);
+        when(trainerDao.create(any(Trainer.class))).thenAnswer(call -> call.getArgument(0));
 
-        assertSame(draft, service.create(draft));
+        Trainer created = service.create(" Jane ", "Doe", "YOGA");
 
-        assertEquals("Alex.Smith", draft.getUsername());
-        assertEquals("Abcdef1234", draft.getPassword());
-        InOrder order = inOrder(registry, dao);
-        order.verify(registry).generateUsername("Alex", "Smith");
-        order.verify(registry).generatePassword();
-        order.verify(dao).create(draft);
+        assertEquals("Jane", created.getFirstName());
+        assertEquals(USERNAME, created.getUsername());
+        assertEquals(PASSWORD, created.getPassword());
+        assertTrue(created.isActive());
+        assertSame(TestTypes.YOGA, created.getSpecialization());
+        verify(trainerDao).create(created);
     }
 
     @Test
-    public void createRejectsAProfileWithCredentials() {
-        Trainer existing = profile(42L);
-        when(registry.generateUsername("Alex", "Smith")).thenReturn("Alex.Smith1");
-        when(registry.generatePassword()).thenReturn("Abcdef1234");
-
-        assertThrows(IllegalStateException.class, () -> service.create(existing));
-        verifyNoInteractions(dao);
+    public void createRejectsMissingFields() {
+        assertThrows(ValidationException.class, () -> service.create(null, "Doe", "YOGA"));
+        assertThrows(ValidationException.class, () -> service.create("Jane", "", "YOGA"));
+        assertThrows(ValidationException.class, () -> service.create("Jane", "Doe", " "));
+        verifyNoInteractions(trainerDao, trainingTypeDao, userRegistry);
     }
 
     @Test
-    public void createPropagatesStorageFailure() {
-        Trainer draft = draft();
-        IllegalStateException failure = new IllegalStateException("Storage unavailable");
-        when(registry.generateUsername("Alex", "Smith")).thenReturn("Alex.Smith");
-        when(registry.generatePassword()).thenReturn("Abcdef1234");
-        when(dao.create(draft)).thenThrow(failure);
+    public void createRejectsUnknownSpecialization() {
+        when(trainingTypeDao.findByName("JUDO")).thenReturn(Optional.empty());
 
-        assertSame(failure, assertThrows(IllegalStateException.class, () -> service.create(draft)));
+        assertThrows(ValidationException.class, () -> service.create("Jane", "Doe", "JUDO"));
+        verifyNoInteractions(trainerDao, userRegistry);
     }
 
     @Test
-    public void updateChangesEditableFieldsOfTheStoredProfileOnly() {
-        Trainer stored = profile(42L);
-        when(dao.findById(42L)).thenReturn(Optional.of(stored));
-        when(dao.update(stored)).thenReturn(true);
+    public void matchCredentialsDelegatesToAuthentication() {
+        when(authenticationService.matchTrainer(USERNAME, "wrong")).thenReturn(false);
 
-        assertTrue(service.update(new Trainer(42L, "Alicia", "Brown", "Injected", "Injected", false, TrainingType.AEROBICA)));
-
-        assertEquals("Alicia", stored.getFirstName());
-        assertEquals("Brown", stored.getLastName());
-        assertEquals(TrainingType.AEROBICA, stored.getSpecialization());
-        assertEquals("Alex.Smith", stored.getUsername());
-        assertEquals("Abcdef1234", stored.getPassword());
-        assertTrue(stored.isActive());
-        verify(dao).update(stored);
-        verifyNoInteractions(registry);
+        assertFalse(service.matchCredentials(USERNAME, "wrong"));
     }
 
     @Test
-    public void updateOfMissingProfileDoesNotWriteToTheDao() {
-        when(dao.findById(42L)).thenReturn(Optional.empty());
+    public void findByUsernameReturnsTheAuthenticatedProfile() {
+        authenticated();
 
-        assertThrows(TrainerNotFoundException.class, () -> service.update(profile(42L)));
-        verify(dao, never()).update(any());
-        verifyNoInteractions(registry);
+        assertSame(trainer, service.findByUsername(USERNAME, PASSWORD));
     }
 
     @Test
-    public void findByIdReturnsTheDaoProfile() {
-        Trainer stored = profile(42L);
-        when(dao.findById(42L)).thenReturn(Optional.of(stored));
+    public void operationsFailWhenAuthenticationFails() {
+        when(authenticationService.authenticateTrainer(USERNAME, "wrong"))
+                .thenThrow(new AuthenticationException("Invalid username or password."));
 
-        assertSame(stored, service.findById(42L));
-        verify(dao).findById(42L);
+        assertThrows(AuthenticationException.class,
+                () -> service.toggleActive(USERNAME, "wrong"));
+        verifyNoInteractions(trainerDao);
     }
 
     @Test
-    public void findByIdThrowsADescriptiveExceptionForMissingProfile() {
-        when(dao.findById(42L)).thenReturn(Optional.empty());
+    public void changePasswordUpdatesThePassword() {
+        authenticated();
 
-        TrainerNotFoundException failure =
-                assertThrows(TrainerNotFoundException.class, () -> service.findById(42L));
-        assertEquals("Trainer with ID 42 does not exist.", failure.getMessage());
+        service.changePassword(USERNAME, PASSWORD, "newPass123");
+
+        assertEquals("newPass123", trainer.getPassword());
+        verify(trainerDao).update(trainer);
     }
 
     @Test
-    public void findAllReturnsTheDaoProfilesIncludingAnEmptyResult() {
-        List<Trainer> profiles = List.of(profile(42L));
-        when(dao.findAll()).thenReturn(profiles, List.of());
+    public void updateChangesTheProfile() {
+        authenticated();
+        when(trainingTypeDao.findByName("AEROBICA")).thenReturn(Optional.of(TestTypes.AEROBICA));
+        when(trainerDao.update(trainer)).thenReturn(trainer);
 
-        assertSame(profiles, service.findAll());
-        assertTrue(service.findAll().isEmpty());
+        Trainer updated = service.update(USERNAME, PASSWORD, "Janet", "Dow", "AEROBICA");
+
+        assertEquals("Janet", updated.getFirstName());
+        assertEquals("Dow", updated.getLastName());
+        assertSame(TestTypes.AEROBICA, updated.getSpecialization());
+        assertEquals(USERNAME, updated.getUsername());
     }
 
-    private Trainer draft() {
-        return new Trainer("Alex", "Smith", true, TrainingType.YOGA);
+    @Test
+    public void updateRejectsMissingNames() {
+        authenticated();
+
+        assertThrows(ValidationException.class,
+                () -> service.update(USERNAME, PASSWORD, "Jane", null, "YOGA"));
+        verifyNoInteractions(trainerDao);
     }
 
-    private Trainer profile(Long id) {
-        return new Trainer(id, "Alex", "Smith", "Alex.Smith", "Abcdef1234", true,
-                TrainingType.YOGA);
+    @Test
+    public void toggleActiveIsNotIdempotent() {
+        authenticated();
+
+        assertFalse(service.toggleActive(USERNAME, PASSWORD));
+        assertTrue(service.toggleActive(USERNAME, PASSWORD));
+        verify(trainerDao, times(2)).update(trainer);
+    }
+
+    private void authenticated() {
+        when(authenticationService.authenticateTrainer(USERNAME, PASSWORD)).thenReturn(trainer);
     }
 }

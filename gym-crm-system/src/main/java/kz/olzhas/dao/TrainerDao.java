@@ -8,9 +8,9 @@ import java.util.Optional;
 public interface TrainerDao {
     Trainer create(Trainer trainer);
 
-    boolean update(Trainer trainer);
+    Trainer update(Trainer trainer);
 
-    Optional<Trainer> findById(long id);
+    Optional<Trainer> findByUsername(String username);
 
-    List<Trainer> findAll();
+    List<Trainer> findNotAssignedToTrainee(String traineeUsername);
 }

@@ -1,152 +1,194 @@
 package kz.olzhas.service;
 
+import kz.olzhas.TestTypes;
 import kz.olzhas.dao.TraineeDao;
-import kz.olzhas.exceptions.TraineeNotFoundException;
+import kz.olzhas.dao.TrainerDao;
+import kz.olzhas.exceptions.AuthenticationException;
+import kz.olzhas.exceptions.TrainerNotFoundException;
+import kz.olzhas.exceptions.ValidationException;
 import kz.olzhas.model.Trainee;
+import kz.olzhas.model.Trainer;
 import kz.olzhas.util.UserRegistry;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.Assert.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @RunWith(MockitoJUnitRunner.StrictStubs.class)
 public class TraineeServiceTest {
-    @Mock private TraineeDao dao;
-    @Mock private UserRegistry registry;
+    private static final String USERNAME = "John.Smith";
+    private static final String PASSWORD = "secret12345";
+
+    @Mock private TraineeDao traineeDao;
+    @Mock private TrainerDao trainerDao;
+    @Mock private AuthenticationService authenticationService;
+    @Mock private UserRegistry userRegistry;
     private TraineeService service;
+    private Trainee trainee;
 
     @Before
     public void setUp() {
-        service = new TraineeService();
-        service.setTraineeDao(dao);
-        service.setUserRegistry(registry);
+        service = new TraineeService(traineeDao, trainerDao, authenticationService, userRegistry);
+        trainee = new Trainee(1L, "John", "Smith", USERNAME, PASSWORD, true,
+                LocalDate.of(1995, 4, 15), "Old street");
     }
 
     @Test
-    public void createAssignsGeneratedCredentialsBeforePersisting() {
-        Trainee draft = draft();
-        when(registry.generateUsername("Alex", "Smith")).thenReturn("Alex.Smith");
-        when(registry.generatePassword()).thenReturn("Abcdef1234");
-        when(dao.create(draft)).thenReturn(draft);
+    public void createGeneratesCredentialsAndSaves() {
+        when(userRegistry.generateUsername("John", "Smith")).thenReturn(USERNAME);
+        when(userRegistry.generatePassword()).thenReturn(PASSWORD);
+        when(traineeDao.create(any(Trainee.class))).thenAnswer(call -> call.getArgument(0));
 
-        assertSame(draft, service.create(draft));
+        Trainee created = service.create(" John ", "Smith", LocalDate.of(1995, 4, 15), "Street");
 
-        assertEquals("Alex.Smith", draft.getUsername());
-        assertEquals("Abcdef1234", draft.getPassword());
-        InOrder order = inOrder(registry, dao);
-        order.verify(registry).generateUsername("Alex", "Smith");
-        order.verify(registry).generatePassword();
-        order.verify(dao).create(draft);
+        assertEquals("John", created.getFirstName());
+        assertEquals(USERNAME, created.getUsername());
+        assertEquals(PASSWORD, created.getPassword());
+        assertTrue(created.isActive());
+        verify(traineeDao).create(created);
     }
 
     @Test
-    public void createRejectsAProfileWithCredentials() {
-        Trainee existing = profile(42L);
-        when(registry.generateUsername("Alex", "Smith")).thenReturn("Alex.Smith1");
-        when(registry.generatePassword()).thenReturn("Abcdef1234");
-
-        assertThrows(IllegalStateException.class, () -> service.create(existing));
-        verifyNoInteractions(dao);
+    public void createRejectsMissingNames() {
+        assertThrows(ValidationException.class, () -> service.create(null, "Smith", null, null));
+        assertThrows(ValidationException.class, () -> service.create("John", " ", null, null));
+        verifyNoInteractions(traineeDao, userRegistry);
     }
 
     @Test
-    public void createPropagatesStorageFailure() {
-        Trainee draft = draft();
-        IllegalStateException failure = new IllegalStateException("Storage unavailable");
-        when(registry.generateUsername("Alex", "Smith")).thenReturn("Alex.Smith");
-        when(registry.generatePassword()).thenReturn("Abcdef1234");
-        when(dao.create(draft)).thenThrow(failure);
+    public void matchCredentialsDelegatesToAuthentication() {
+        when(authenticationService.matchTrainee(USERNAME, PASSWORD)).thenReturn(true);
 
-        assertSame(failure, assertThrows(IllegalStateException.class, () -> service.create(draft)));
+        assertTrue(service.matchCredentials(USERNAME, PASSWORD));
     }
 
     @Test
-    public void updateChangesEditableFieldsOfTheStoredProfileOnly() {
-        Trainee stored = profile(42L);
-        when(dao.findById(42L)).thenReturn(Optional.of(stored));
-        when(dao.update(stored)).thenReturn(true);
+    public void findByUsernameReturnsTheAuthenticatedProfile() {
+        authenticated();
 
-        assertTrue(service.update(new Trainee(42L, "Alicia", "Brown", "Injected", "Injected", false, null, "New address")));
-
-        assertEquals("Alicia", stored.getFirstName());
-        assertEquals("Brown", stored.getLastName());
-        assertEquals("New address", stored.getAddress());
-        assertEquals("Alex.Smith", stored.getUsername());
-        assertEquals("Abcdef1234", stored.getPassword());
-        assertTrue(stored.isActive());
-        verify(dao).update(stored);
-        verifyNoInteractions(registry);
+        assertSame(trainee, service.findByUsername(USERNAME, PASSWORD));
     }
 
     @Test
-    public void updateOfMissingProfileDoesNotWriteToTheDao() {
-        when(dao.findById(42L)).thenReturn(Optional.empty());
+    public void operationsFailWhenAuthenticationFails() {
+        when(authenticationService.authenticateTrainee(USERNAME, "wrong"))
+                .thenThrow(new AuthenticationException("Invalid username or password."));
 
-        assertThrows(TraineeNotFoundException.class, () -> service.update(profile(42L)));
-        verify(dao, never()).update(any());
-        verifyNoInteractions(registry);
+        assertThrows(AuthenticationException.class,
+                () -> service.changePassword(USERNAME, "wrong", "newPass123"));
+        assertThrows(AuthenticationException.class, () -> service.delete(USERNAME, "wrong"));
+        verifyNoInteractions(traineeDao);
     }
 
     @Test
-    public void findByIdReturnsTheDaoProfile() {
-        Trainee stored = profile(42L);
-        when(dao.findById(42L)).thenReturn(Optional.of(stored));
+    public void changePasswordUpdatesThePassword() {
+        authenticated();
 
-        assertSame(stored, service.findById(42L));
-        verify(dao).findById(42L);
+        service.changePassword(USERNAME, PASSWORD, "newPass123");
+
+        assertEquals("newPass123", trainee.getPassword());
+        verify(traineeDao).update(trainee);
     }
 
     @Test
-    public void findByIdThrowsADescriptiveExceptionForMissingProfile() {
-        when(dao.findById(42L)).thenReturn(Optional.empty());
+    public void changePasswordRejectsBlankPassword() {
+        authenticated();
 
-        TraineeNotFoundException failure =
-                assertThrows(TraineeNotFoundException.class, () -> service.findById(42L));
-        assertEquals("Trainee with ID 42 does not exist.", failure.getMessage());
+        assertThrows(ValidationException.class,
+                () -> service.changePassword(USERNAME, PASSWORD, " "));
+        verifyNoInteractions(traineeDao);
     }
 
     @Test
-    public void findAllReturnsTheDaoProfilesIncludingAnEmptyResult() {
-        List<Trainee> profiles = List.of(profile(42L));
-        when(dao.findAll()).thenReturn(profiles, List.of());
+    public void updateChangesTheProfile() {
+        authenticated();
+        when(traineeDao.update(trainee)).thenReturn(trainee);
 
-        assertSame(profiles, service.findAll());
-        assertTrue(service.findAll().isEmpty());
+        Trainee updated = service.update(USERNAME, PASSWORD, "Johnny", "Smithson",
+                LocalDate.of(1990, 1, 1), "New street");
+
+        assertEquals("Johnny", updated.getFirstName());
+        assertEquals("Smithson", updated.getLastName());
+        assertEquals("New street", updated.getAddress());
+        assertEquals(USERNAME, updated.getUsername());
     }
 
     @Test
-    public void deleteDelegatesToTheDao() {
-        service.delete(42L);
+    public void updateRejectsMissingNames() {
+        authenticated();
 
-        verify(dao).delete(42L);
-        verifyNoMoreInteractions(dao);
-        verifyNoInteractions(registry);
+        assertThrows(ValidationException.class,
+                () -> service.update(USERNAME, PASSWORD, "", "Smith", null, null));
+        verifyNoInteractions(traineeDao);
     }
 
     @Test
-    public void deletePropagatesMissingProfile() {
-        TraineeNotFoundException failure = new TraineeNotFoundException("Missing profile");
-        doThrow(failure).when(dao).delete(42L);
+    public void toggleActiveIsNotIdempotent() {
+        authenticated();
 
-        assertSame(failure, assertThrows(TraineeNotFoundException.class, () -> service.delete(42L)));
-        verifyNoInteractions(registry);
+        assertFalse(service.toggleActive(USERNAME, PASSWORD));
+        assertTrue(service.toggleActive(USERNAME, PASSWORD));
+        verify(traineeDao, times(2)).update(trainee);
     }
 
-    private Trainee draft() {
-        return new Trainee("Alex", "Smith", true, null, "Test address");
+    @Test
+    public void deleteRemovesTheTrainee() {
+        authenticated();
+
+        service.delete(USERNAME, PASSWORD);
+
+        verify(traineeDao).delete(trainee);
     }
 
-    private Trainee profile(Long id) {
-        return new Trainee(id, "Alex", "Smith", "Alex.Smith", "Abcdef1234", true,
-                null, "Test address");
+    @Test
+    public void getUnassignedTrainersUsesTheDao() {
+        authenticated();
+        List<Trainer> trainers = List.of(trainer("Jane.Doe"));
+        when(trainerDao.findNotAssignedToTrainee(USERNAME)).thenReturn(trainers);
+
+        assertSame(trainers, service.getUnassignedTrainers(USERNAME, PASSWORD));
+    }
+
+    @Test
+    public void updateTrainersReplacesTheList() {
+        authenticated();
+        Trainer oldTrainer = trainer("Old.Trainer");
+        Trainer newTrainer = trainer("Jane.Doe");
+        trainee.addTrainer(oldTrainer);
+        when(trainerDao.findByUsername("Jane.Doe")).thenReturn(Optional.of(newTrainer));
+
+        List<Trainer> result = service.updateTrainers(USERNAME, PASSWORD, List.of("Jane.Doe"));
+
+        assertEquals(List.of(newTrainer), result);
+        assertTrue(oldTrainer.getTrainees().isEmpty());
+        verify(traineeDao).update(trainee);
+    }
+
+    @Test
+    public void updateTrainersFailsForUnknownTrainer() {
+        authenticated();
+        when(trainerDao.findByUsername("Nobody")).thenReturn(Optional.empty());
+
+        assertThrows(TrainerNotFoundException.class,
+                () -> service.updateTrainers(USERNAME, PASSWORD, List.of("Nobody")));
+        verifyNoInteractions(traineeDao);
+    }
+
+    private void authenticated() {
+        when(authenticationService.authenticateTrainee(USERNAME, PASSWORD)).thenReturn(trainee);
+    }
+
+    private Trainer trainer(String username) {
+        return new Trainer(null, "First", "Last", username, PASSWORD, true, TestTypes.YOGA);
     }
 }

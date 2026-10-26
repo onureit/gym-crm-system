@@ -1,142 +1,141 @@
 package kz.olzhas.service;
 
-import kz.olzhas.dao.TraineeDao;
+import kz.olzhas.TestTypes;
 import kz.olzhas.dao.TrainerDao;
 import kz.olzhas.dao.TrainingDao;
-import kz.olzhas.exceptions.TrainingNotFoundException;
+import kz.olzhas.dao.TrainingTypeDao;
+import kz.olzhas.exceptions.AuthenticationException;
+import kz.olzhas.exceptions.TrainerNotFoundException;
+import kz.olzhas.exceptions.ValidationException;
 import kz.olzhas.model.Trainee;
 import kz.olzhas.model.Trainer;
 import kz.olzhas.model.Training;
-import kz.olzhas.model.TrainingType;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
-import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.Assert.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @RunWith(MockitoJUnitRunner.StrictStubs.class)
 public class TrainingServiceTest {
+    private static final String TRAINEE = "John.Smith";
+    private static final String TRAINER = "Jane.Doe";
+    private static final String PASSWORD = "secret12345";
+    private static final LocalDate DATE = LocalDate.of(2026, 10, 12);
+
     @Mock private TrainingDao trainingDao;
-    @Mock private TraineeDao traineeDao;
     @Mock private TrainerDao trainerDao;
+    @Mock private TrainingTypeDao trainingTypeDao;
+    @Mock private AuthenticationService authenticationService;
     private TrainingService service;
+    private Trainee trainee;
+    private Trainer trainer;
 
     @Before
     public void setUp() {
-        service = new TrainingService();
-        service.setTrainingDao(trainingDao);
-        service.setTraineeDao(traineeDao);
-        service.setTrainerDao(trainerDao);
+        service = new TrainingService(trainingDao, trainerDao, trainingTypeDao, authenticationService);
+        trainee = new Trainee(1L, "John", "Smith", TRAINEE, PASSWORD, true, null, null);
+        trainer = new Trainer(2L, "Jane", "Doe", TRAINER, PASSWORD, true, TestTypes.YOGA);
     }
 
     @Test
-    public void createChecksBothParticipantsBeforePersisting() {
-        Training draft = training(null, 12L, 34L);
-        Training stored = training(56L, 12L, 34L);
-        when(traineeDao.findById(12L)).thenReturn(Optional.of(new Trainee("Alex", "Smith", true, null, null)));
-        when(trainerDao.findById(34L)).thenReturn(Optional.of(new Trainer("Alex", "Smith", true, null)));
-        when(trainingDao.create(draft)).thenReturn(stored);
+    public void createSavesTheTraining() {
+        when(authenticationService.authenticateTrainee(TRAINEE, PASSWORD)).thenReturn(trainee);
+        when(trainerDao.findByUsername(TRAINER)).thenReturn(Optional.of(trainer));
+        when(trainingTypeDao.findByName("YOGA")).thenReturn(Optional.of(TestTypes.YOGA));
+        when(trainingDao.create(any(Training.class))).thenAnswer(call -> call.getArgument(0));
 
-        assertSame(stored, service.create(draft));
+        Training created = service.create(TRAINEE, PASSWORD, TRAINER, "Morning yoga", "YOGA", DATE, 60);
 
-        InOrder order = inOrder(traineeDao, trainerDao, trainingDao);
-        order.verify(traineeDao).findById(12L);
-        order.verify(trainerDao).findById(34L);
-        order.verify(trainingDao).create(draft);
-        verifyNoMoreInteractions(traineeDao, trainerDao, trainingDao);
+        assertSame(trainee, created.getTrainee());
+        assertSame(trainer, created.getTrainer());
+        assertEquals("Morning yoga", created.getTrainingName());
+        assertSame(TestTypes.YOGA, created.getTrainingType());
+        assertEquals(DATE, created.getTrainingDate());
+        assertEquals(Integer.valueOf(60), created.getTrainingDuration());
     }
 
     @Test
-    public void missingTraineePreventsStorageAndTrainerLookup() {
-        Training draft = training(null, 12L, 34L);
-        when(traineeDao.findById(12L)).thenReturn(Optional.empty());
+    public void createRejectsInvalidFields() {
+        when(authenticationService.authenticateTrainee(TRAINEE, PASSWORD)).thenReturn(trainee);
 
-        IllegalArgumentException failure =
-                assertThrows(IllegalArgumentException.class, () -> service.create(draft));
-        assertEquals("Trainee with ID 12 does not exist.", failure.getMessage());
-        verifyNoInteractions(trainerDao, trainingDao);
+        assertThrows(ValidationException.class,
+                () -> service.create(TRAINEE, PASSWORD, TRAINER, " ", "YOGA", DATE, 60));
+        assertThrows(ValidationException.class,
+                () -> service.create(TRAINEE, PASSWORD, TRAINER, "Yoga", "YOGA", null, 60));
+        assertThrows(ValidationException.class,
+                () -> service.create(TRAINEE, PASSWORD, TRAINER, "Yoga", "YOGA", DATE, 0));
+        assertThrows(ValidationException.class,
+                () -> service.create(TRAINEE, PASSWORD, null, "Yoga", "YOGA", DATE, 60));
+        verifyNoInteractions(trainingDao, trainerDao, trainingTypeDao);
     }
 
     @Test
-    public void missingTrainerPreventsStorage() {
-        Training draft = training(null, 12L, 34L);
-        when(traineeDao.findById(12L)).thenReturn(Optional.of(new Trainee("Alex", "Smith", true, null, null)));
-        when(trainerDao.findById(34L)).thenReturn(Optional.empty());
+    public void createFailsForUnknownTrainer() {
+        when(authenticationService.authenticateTrainee(TRAINEE, PASSWORD)).thenReturn(trainee);
+        when(trainerDao.findByUsername("Nobody")).thenReturn(Optional.empty());
 
-        IllegalArgumentException failure =
-                assertThrows(IllegalArgumentException.class, () -> service.create(draft));
-        assertEquals("Trainer with ID 34 does not exist.", failure.getMessage());
+        assertThrows(TrainerNotFoundException.class,
+                () -> service.create(TRAINEE, PASSWORD, "Nobody", "Yoga", "YOGA", DATE, 60));
         verifyNoInteractions(trainingDao);
     }
 
     @Test
-    public void nullParticipantIdsSkipParticipantLookups() {
-        Training draft = training(null, null, null);
-        when(trainingDao.create(draft)).thenReturn(draft);
+    public void createFailsForUnknownTrainingType() {
+        when(authenticationService.authenticateTrainee(TRAINEE, PASSWORD)).thenReturn(trainee);
+        when(trainerDao.findByUsername(TRAINER)).thenReturn(Optional.of(trainer));
+        when(trainingTypeDao.findByName("JUDO")).thenReturn(Optional.empty());
 
-        assertSame(draft, service.create(draft));
-        verifyNoInteractions(traineeDao, trainerDao);
+        assertThrows(ValidationException.class,
+                () -> service.create(TRAINEE, PASSWORD, TRAINER, "Judo", "JUDO", DATE, 60));
+        verifyNoInteractions(trainingDao);
     }
 
     @Test
-    public void participantLookupFailurePreventsStorage() {
-        Training draft = training(null, 12L, 34L);
-        IllegalStateException failure = new IllegalStateException("Lookup failed");
-        when(traineeDao.findById(12L)).thenThrow(failure);
+    public void createRequiresAuthentication() {
+        when(authenticationService.authenticateTrainee(TRAINEE, "wrong"))
+                .thenThrow(new AuthenticationException("Invalid username or password."));
 
-        assertSame(failure, assertThrows(IllegalStateException.class, () -> service.create(draft)));
-        verifyNoInteractions(trainerDao, trainingDao);
+        assertThrows(AuthenticationException.class,
+                () -> service.create(TRAINEE, "wrong", TRAINER, "Yoga", "YOGA", DATE, 60));
+        verifyNoInteractions(trainingDao, trainerDao, trainingTypeDao);
     }
 
     @Test
-    public void createPropagatesStorageFailure() {
-        Training draft = training(null, null, null);
-        IllegalStateException failure = new IllegalStateException("Storage unavailable");
-        when(trainingDao.create(draft)).thenThrow(failure);
+    public void getTraineeTrainingsPassesTheCriteria() {
+        when(authenticationService.authenticateTrainee(TRAINEE, PASSWORD)).thenReturn(trainee);
+        List<Training> trainings = List.of(new Training());
+        when(trainingDao.findTraineeTrainings(TRAINEE, DATE, DATE, "Jane", "YOGA"))
+                .thenReturn(trainings);
 
-        assertSame(failure, assertThrows(IllegalStateException.class, () -> service.create(draft)));
+        assertSame(trainings,
+                service.getTraineeTrainings(TRAINEE, PASSWORD, DATE, DATE, "Jane", "YOGA"));
     }
 
     @Test
-    public void findByIdReturnsTheDaoTraining() {
-        Training stored = training(56L, 12L, 34L);
-        when(trainingDao.findById(56L)).thenReturn(Optional.of(stored));
+    public void getTrainerTrainingsPassesTheCriteria() {
+        when(authenticationService.authenticateTrainer(TRAINER, PASSWORD)).thenReturn(trainer);
+        when(trainingDao.findTrainerTrainings(TRAINER, null, DATE, "John")).thenReturn(List.of());
 
-        assertSame(stored, service.findById(56L));
-        verifyNoInteractions(traineeDao, trainerDao);
+        assertTrue(service.getTrainerTrainings(TRAINER, PASSWORD, null, DATE, "John").isEmpty());
     }
 
     @Test
-    public void findByIdThrowsADescriptiveExceptionForMissingTraining() {
-        when(trainingDao.findById(56L)).thenReturn(Optional.empty());
+    public void getTrainerTrainingsRequiresAuthentication() {
+        when(authenticationService.authenticateTrainer(TRAINER, "wrong"))
+                .thenThrow(new AuthenticationException("Invalid username or password."));
 
-        TrainingNotFoundException failure =
-                assertThrows(TrainingNotFoundException.class, () -> service.findById(56L));
-        assertEquals("Training with ID 56 does not exist.", failure.getMessage());
-    }
-
-    @Test
-    public void findAllReturnsTheDaoTrainingsIncludingAnEmptyResult() {
-        List<Training> trainings = List.of(training(56L, 12L, 34L));
-        when(trainingDao.findAll()).thenReturn(trainings, List.of());
-
-        assertSame(trainings, service.findAll());
-        assertTrue(service.findAll().isEmpty());
-        verifyNoInteractions(traineeDao, trainerDao);
-    }
-
-    private Training training(Long id, Long traineeId, Long trainerId) {
-        return new Training(id, traineeId, trainerId, "Test session", TrainingType.YOGA,
-                LocalDate.of(2026, 1, 2), Duration.ofMinutes(45));
+        assertThrows(AuthenticationException.class,
+                () -> service.getTrainerTrainings(TRAINER, "wrong", null, null, null));
+        verifyNoInteractions(trainingDao);
     }
 }
